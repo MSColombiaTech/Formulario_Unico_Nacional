@@ -131,14 +131,21 @@ export const EJEMPLO_FUN_BOGOTA: FunSolicitudPayload = {
       correoElectronico: 'roberto@salamanca-consultores.co',
       telefono: '3138801928'
     },
-    supervisorTecnicoIndependiente: {
-      nombre: 'ING. BEATRIZ HELENA VANEGAS',
-      cedula: '41.980.231',
-      matriculaProfesional: '63202-088712 QUI',
-      fechaExpedicionMatricula: '2010-06-22',
-      correoElectronico: 'beatriz.vanegas@supervisiontecnica.co',
-      telefono: '3174509122',
-      exigeSupervisionTecnica: true
+    topografo: {
+      nombre: 'ING. HERNANDO GÓMEZ VÉLEZ',
+      cedula: '79.351.488',
+      matriculaProfesional: '25202-094182 CND',
+      fechaExpedicionMatricula: '2009-07-15',
+      correoElectronico: 'topografia.gomez@gmail.com',
+      telefono: '3124458899'
+    },
+    otrosEspecialistas1: {
+      nombre: 'ING. ANDRÉS CAMILO OROZCO',
+      cedula: '80.312.455',
+      matriculaProfesional: '25202-148902 CND',
+      fechaExpedicionMatricula: '2016-11-20',
+      correoElectronico: 'andres.orozco@hidrosanitarios.co',
+      telefono: '3189901122'
     }
   },
   responsableSolicitud: {
@@ -151,13 +158,21 @@ export const EJEMPLO_FUN_BOGOTA: FunSolicitudPayload = {
   },
   anexoConstruccionSostenible: {
     zonificacionClimatica: 'FRIO',
+    zonaClimaticaDistinta: {
+      esDistinta: false
+    },
     medidasPasivas: {
       ventilacionNatural: true,
       iluminacionNatural: true,
       orientacionSolar: true,
       alerosYSombrillas: true,
       aislamientoTermico: true,
-      masaTermica: false
+      masaTermica: false,
+      cubiertaVerde: false,
+      elementosProteccionSolar: true,
+      vidriosProteccionSolar: true,
+      cubiertaProteccionSolar: true,
+      paredProteccionSolar: false
     },
     medidasActivas: {
       iluminacionLedEficiente: true,
@@ -166,10 +181,35 @@ export const EJEMPLO_FUN_BOGOTA: FunSolicitudPayload = {
       energiaSolarFotovoltaica: true,
       colectoresSolaresTermicos: true,
       griferiasAhorroAgua: true,
-      reusoAguaLluvia: true
+      reusoAguaLluvia: true,
+      iluminacionEficiente: true,
+      equiposAireEficientes: false,
+      aguaCalienteSolar: true,
+      controlesIluminacion: true,
+      variadoresVelocidadBombas: true
+    },
+    materialidadMuroExterno: 'ladrillo_portante',
+    materialidadMuroInterno: 'ladrillo_numero_4',
+    materialidadCubierta: 'concreto_vaciado',
+    relacionMuroVentana: {
+      norte: 25,
+      sur: 25,
+      oriente: 30,
+      occidente: 20,
+      alturaPisoTecho: 2.6
+    },
+    medidasAhorroAgua: {
+      sanitariosBajoConsumo: true,
+      lavamanosBajoConsumo: true,
+      duchasBajoConsumo: true,
+      orinalesBajoConsumo: false,
+      recoleccionAguaLluvia: true
     },
     porcentajeAhorroAguaEsperado: 35,
     porcentajeAhorroEnergiaEsperado: 28,
+    areaNetaUrbanismoPaisajismo: 185.5,
+    areaNetaZonasComunes: 340.0,
+    areaNetaParqueaderos: 420.0,
     descripcionMedidasAdicionales: 'El proyecto implementa sistema de captación y filtrado de aguas pluviales para sanitarios y riego de cubiertas verdes, luminarias LED de 130 lm/W en zonas comunes y paneles solares fotovoltaicos para el 30% de la energía de bombeo.'
   }
 };

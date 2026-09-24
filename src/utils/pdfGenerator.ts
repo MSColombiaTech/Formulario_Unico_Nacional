@@ -1,22 +1,8 @@
-import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib';
-import { FunSolicitudPayload, ROLES_PROFESIONALES } from '../types/fun';
+import { PDFDocument, rgb, StandardFonts, PDFPage } from 'pdf-lib';
+import { FunSolicitudPayload } from '../types/fun';
 
-interface RenderContext {
-  doc: PDFDocument;
-  page: PDFPage;
-  fontRegular: PDFFont;
-  fontBold: PDFFont;
-  width: number;
-  height: number;
-}
-
-const PRIMARY_COLOR = rgb(0.08, 0.18, 0.36); // #142e5c Navy
-const SECONDARY_BG = rgb(0.93, 0.95, 0.98);
-const BORDER_COLOR = rgb(0.65, 0.72, 0.82);
-const TEXT_DARK = rgb(0.1, 0.13, 0.18);
-const TEXT_MUTED = rgb(0.4, 0.45, 0.52);
-
-export function cleanWinAnsi(str: string | undefined): string {
+// Standard clean text function ensuring WinAnsi compatibility without breaking Spanish characters
+export function cleanWinAnsi(str: string | undefined | null): string {
   if (!str) return '';
   return String(str)
     .replace(/[≥]/g, '>=')
@@ -33,680 +19,500 @@ export function cleanWinAnsi(str: string | undefined): string {
     .replace(/[^\x00-\x7F\xA0-\xFF]/g, '');
 }
 
-function drawHeader(ctx: RenderContext, pageNum: number, pageSubtitle: string) {
-  const { page, fontRegular, fontBold, width, height } = ctx;
-  
-  // Top Header Banner
-  page.drawRectangle({
-    x: 36,
-    y: height - 68,
-    width: width - 72,
-    height: 44,
-    color: PRIMARY_COLOR
-  });
-
-  page.drawText(cleanWinAnsi('REPÚBLICA DE COLOMBIA - MINISTERIO DE VIVIENDA, CIUDAD Y TERRITORIO'), {
-    x: 48,
-    y: height - 40,
-    size: 8.5,
-    font: fontBold,
-    color: rgb(1, 1, 1)
-  });
-
-  page.drawText(cleanWinAnsi('FORMULARIO ÚNICO NACIONAL (FUN) - RESOLUCIÓN 1051 DE 2025 (DECRETO 1077 DE 2015)'), {
-    x: 48,
-    y: height - 54,
-    size: 7.5,
-    font: fontRegular,
-    color: rgb(0.9, 0.94, 1)
-  });
-
-  page.drawText(cleanWinAnsi(`PÁGINA ${pageNum} DE 4 - ${pageSubtitle}`), {
-    x: width - 210,
-    y: height - 40,
-    size: 7.5,
-    font: fontBold,
-    color: rgb(1, 0.9, 0.4)
-  });
-
-  // Footer
-  page.drawLine({
-    start: { x: 36, y: 32 },
-    end: { x: width - 36, y: 32 },
-    thickness: 0.8,
-    color: BORDER_COLOR
-  });
-
-  page.drawText(cleanWinAnsi('Formulario Único Nacional para la Radicación de Licencias Urbanísticas en Colombia (Res. 1051/2025)'), {
-    x: 36,
-    y: 20,
-    size: 6.5,
-    font: fontRegular,
-    color: TEXT_MUTED
-  });
-
-  page.drawText(cleanWinAnsi(`Página ${pageNum} de 4`), {
-    x: width - 85,
-    y: 20,
-    size: 7,
-    font: fontBold,
-    color: PRIMARY_COLOR
-  });
-}
-
-function drawSectionTitle(page: PDFPage, font: PDFFont, title: string, y: number, width: number) {
-  page.drawRectangle({
-    x: 36,
-    y: y - 3,
-    width: width - 72,
-    height: 16,
-    color: SECONDARY_BG
-  });
-
-  page.drawRectangle({
-    x: 36,
-    y: y - 3,
-    width: 4,
-    height: 16,
-    color: PRIMARY_COLOR
-  });
-
-  page.drawText(cleanWinAnsi(title), {
-    x: 45,
-    y: y + 2,
-    size: 8,
-    font: font,
-    color: PRIMARY_COLOR
-  });
-
-  return y - 10;
-}
-
-function drawBoxField(
-  page: PDFPage,
-  fontR: PDFFont,
-  fontB: PDFFont,
-  label: string,
-  value: string | undefined,
-  x: number,
-  y: number,
-  w: number,
-  h: number = 26
-) {
-  page.drawRectangle({
-    x,
-    y,
-    width: w,
-    height: h,
-    borderWidth: 0.6,
-    borderColor: BORDER_COLOR,
-    color: rgb(1, 1, 1)
-  });
-
-  page.drawText(cleanWinAnsi(label.toUpperCase()), {
-    x: x + 4,
-    y: y + h - 8,
-    size: 6,
-    font: fontB,
-    color: TEXT_MUTED
-  });
-
-  const displayVal = cleanWinAnsi(value || '---').substring(0, Math.floor(w / 4.8));
-  page.drawText(displayVal, {
-    x: x + 4,
-    y: y + 5,
-    size: 7.5,
-    font: fontR,
-    color: TEXT_DARK
-  });
-}
-
-function drawCheckItem(
-  page: PDFPage,
-  fontR: PDFFont,
-  fontB: PDFFont,
-  label: string,
-  checked: boolean,
-  x: number,
-  y: number,
-  w: number
-) {
-  // Checkbox box
-  page.drawRectangle({
-    x,
-    y,
-    width: 9,
-    height: 9,
-    borderWidth: 0.8,
-    borderColor: checked ? PRIMARY_COLOR : BORDER_COLOR,
-    color: checked ? SECONDARY_BG : rgb(1, 1, 1)
-  });
-
-  if (checked) {
-    page.drawText('X', {
-      x: x + 1.8,
-      y: y + 1.5,
-      size: 7,
-      font: fontB,
-      color: PRIMARY_COLOR
-    });
-  }
-
-  page.drawText(cleanWinAnsi(label), {
-    x: x + 13,
-    y: y + 1,
-    size: 7,
-    font: checked ? fontB : fontR,
-    color: checked ? PRIMARY_COLOR : TEXT_DARK
-  });
-}
-
-export async function generarFunPdfBytes(solicitud: FunSolicitudPayload): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  const fontRegular = await doc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-
-  const WIDTH = 612; // Letter
-  const HEIGHT = 792;
-
-  // ============================================================================
-  // PÁGINA 1: GENERALIDADES, IDENTIFICACIÓN Y PREDIO
-  // ============================================================================
-  const p1 = doc.addPage([WIDTH, HEIGHT]);
-  const ctx1: RenderContext = { doc, page: p1, fontRegular, fontBold, width: WIDTH, height: HEIGHT };
-  drawHeader(ctx1, 1, 'GENERALIDADES, IDENTIFICACION Y PREDIO');
-
-  let y = HEIGHT - 85;
-
-  // SECCIÓN 0: DATOS GENERALES
-  y = drawSectionTitle(p1, fontBold, '0. DATOS GENERALES DE RADICACION', y, WIDTH);
-  y -= 26;
-  drawBoxField(p1, fontRegular, fontBold, 'Autoridad / Curaduria / Planeacion', solicitud.general.autoridad, 36, y, 220);
-  drawBoxField(p1, fontRegular, fontBold, 'Radicacion No.', solicitud.general.radicacionNo || 'SIN RADICAR', 260, y, 110);
-  drawBoxField(p1, fontRegular, fontBold, 'Departamento', solicitud.general.departamento, 374, y, 95);
-  drawBoxField(p1, fontRegular, fontBold, 'Municipio', solicitud.general.municipio, 473, y, 103);
-  y -= 28;
-  drawBoxField(p1, fontRegular, fontBold, 'Fecha de Radicacion (AAAA-MM-DD)', solicitud.general.fecha, 36, y, 180);
-  drawBoxField(p1, fontRegular, fontBold, 'Decreto Reglamentario', 'Decreto 1077 de 2015 / Res. 1051 de 2025', 220, y, 356);
-
-  // SECCIÓN 1: IDENTIFICACIÓN DE LA SOLICITUD
-  y -= 22;
-  y = drawSectionTitle(p1, fontBold, '1. IDENTIFICACION DE LA SOLICITUD', y, WIDTH);
-
-  // 1.1 Tipo de Trámite
-  y -= 14;
-  p1.drawText(cleanWinAnsi('1.1 Tipo de Trámite Principal:'), { x: 36, y, size: 7.5, font: fontBold, color: PRIMARY_COLOR });
-  y -= 14;
-  const tramites: Array<{ key: string; label: string }> = [
-    { key: 'URBANIZACION', label: 'Urbanización' },
-    { key: 'PARCELACION', label: 'Parcelación' },
-    { key: 'SUBDIVISION', label: 'Subdivisión' },
-    { key: 'CONSTRUCCION', label: 'Construcción' },
-    { key: 'ESPACIO_PUBLICO', label: 'Espacio Público' },
-    { key: 'RECONOCIMIENTO', label: 'Reconocimiento' },
-    { key: 'OTRAS', label: 'Otras' }
-  ];
-  let tramX = 36;
-  tramites.forEach((t) => {
-    drawCheckItem(p1, fontRegular, fontBold, t.label, solicitud.identificacion.tipoTramite === t.key, tramX, y, 75);
-    tramX += 77;
-  });
-
-  // 1.2 Objeto del Trámite
-  y -= 16;
-  p1.drawText(cleanWinAnsi('1.2 Objeto del Trámite:'), { x: 36, y, size: 7.5, font: fontBold, color: PRIMARY_COLOR });
-  y -= 14;
-  const objetos: Array<{ key: string; label: string }> = [
-    { key: 'INICIAL', label: 'Inicial' },
-    { key: 'MODIFICACION', label: 'Modificación' },
-    { key: 'REVALIDACION', label: 'Revalidación' },
-    { key: 'OTRAS', label: `Otras: ${solicitud.identificacion.objetoTramiteCual || ''}` }
-  ];
-  let objX = 36;
-  objetos.forEach((o) => {
-    drawCheckItem(p1, fontRegular, fontBold, o.label, solicitud.identificacion.objetoTramite === o.key, objX, y, 120);
-    objX += 135;
-  });
-
-  // 1.3 Modalidades de Construcción
-  y -= 16;
-  p1.drawText(cleanWinAnsi('1.3 Modalidades de Construcción (si aplica):'), { x: 36, y, size: 7.5, font: fontBold, color: PRIMARY_COLOR });
-  y -= 13;
-  const modConstruccion: Array<{ key: string; label: string }> = [
-    { key: 'OBRA_NUEVA', label: 'Obra Nueva' },
-    { key: 'AMPLIACION', label: 'Ampliación' },
-    { key: 'ADECUACION', label: 'Adecuación' },
-    { key: 'MODIFICACION', label: 'Modificación' },
-    { key: 'RESTAURACION', label: 'Restauración' }
-  ];
-  let mcX = 36;
-  modConstruccion.forEach((mc) => {
-    const isChecked = solicitud.identificacion.modalidadesConstruccion?.includes(mc.key as any) ?? false;
-    drawCheckItem(p1, fontRegular, fontBold, mc.label, isChecked, mcX, y, 105);
-    mcX += 108;
-  });
-
-  y -= 13;
-  const modConstruccion2: Array<{ key: string; label: string }> = [
-    { key: 'REFORZAMIENTO_ESTRUCTURAL', label: 'Reforzamiento Estructural' },
-    { key: 'DEMOLICION_TOTAL', label: 'Demolición Total' },
-    { key: 'DEMOLICION_PARCIAL', label: 'Demol. Parcial' },
-    { key: 'RECONSTRUCCION', label: 'Reconstrucción' },
-    { key: 'CERRAMIENTO', label: 'Cerramiento' }
-  ];
-  mcX = 36;
-  modConstruccion2.forEach((mc) => {
-    const isChecked = solicitud.identificacion.modalidadesConstruccion?.includes(mc.key as any) ?? false;
-    drawCheckItem(p1, fontRegular, fontBold, mc.label, isChecked, mcX, y, 105);
-    mcX += 108;
-  });
-
-  // 1.4 Usos y Categorías
-  y -= 16;
-  p1.drawText(cleanWinAnsi('1.4 Usos Predominantes:'), { x: 36, y, size: 7.5, font: fontBold, color: PRIMARY_COLOR });
-  y -= 13;
-  const usos: Array<{ key: string; label: string }> = [
-    { key: 'VIVIENDA', label: 'Vivienda' },
-    { key: 'COMERCIO_SERVICIOS', label: 'Comercio / Servicios' },
-    { key: 'DOTACIONAL', label: 'Dotacional' },
-    { key: 'INDUSTRIAL', label: 'Industrial' },
-    { key: 'OTRO', label: `Otro: ${solicitud.identificacion.usosOtroCual || ''}` }
-  ];
-  let usoX = 36;
-  usos.forEach((u) => {
-    const isChecked = solicitud.identificacion.usos?.includes(u.key as any) ?? false;
-    drawCheckItem(p1, fontRegular, fontBold, u.label, isChecked, usoX, y, 100);
-    usoX += 108;
-  });
-
-  // 1.5 Áreas, Tipo Vivienda y BIC
-  y -= 16;
-  p1.drawText(cleanWinAnsi('1.5 Escala y Regulaciones Especiales:'), { x: 36, y, size: 7.5, font: fontBold, color: PRIMARY_COLOR });
-  y -= 13;
-  const areas: Array<{ key: string; label: string }> = [
-    { key: 'MENOR_2000', label: '< 2.000 m2' },
-    { key: 'MAYOR_IGUAL_2000', label: '>= 2.000 m2 (Ley 1796)' },
-    { key: 'SUPERA_POR_AMPLIACION_2000', label: 'Supera 2.000 m2 por Ampl.' },
-    { key: 'CINCO_O_MAS_VIVIENDA', label: '>= 5 Unidades Vivienda' }
-  ];
-  let arX = 36;
-  areas.forEach((a) => {
-    drawCheckItem(p1, fontRegular, fontBold, a.label, solicitud.identificacion.areaUnidadesConstruidas === a.key, arX, y, 130);
-    arX += 135;
-  });
-
-  y -= 14;
-  drawCheckItem(p1, fontRegular, fontBold, 'Vivienda Interés Prioritario (VIP)', solicitud.identificacion.tipoVivienda === 'VIP', 36, y, 160);
-  drawCheckItem(p1, fontRegular, fontBold, 'Vivienda Interés Social (VIS)', solicitud.identificacion.tipoVivienda === 'VIS', 196, y, 160);
-  drawCheckItem(p1, fontRegular, fontBold, 'No VIS', solicitud.identificacion.tipoVivienda === 'NO_VIS', 356, y, 80);
-  drawCheckItem(p1, fontRegular, fontBold, 'Inmueble de Interés Cultural (BIC)', solicitud.identificacion.bienInteresCultural, 436, y, 140);
-
-  // SECCIÓN 2: INFORMACIÓN SOBRE EL PREDIO
-  y -= 22;
-  y = drawSectionTitle(p1, fontBold, '2. INFORMACION SOBRE EL PREDIO OBJETO DE LA SOLICITUD', y, WIDTH);
-  y -= 26;
-  drawBoxField(p1, fontRegular, fontBold, 'Direccion Actual del Inmueble', solicitud.predio.direccionActual, 36, y, 310);
-  drawBoxField(p1, fontRegular, fontBold, 'Direcciones Anteriores', solicitud.predio.direccionesAnteriores || 'NINGUNA', 350, y, 226);
-  y -= 28;
-  drawBoxField(p1, fontRegular, fontBold, 'Matricula Inmobiliaria', solicitud.predio.matriculaInmobiliaria, 36, y, 175);
-  drawBoxField(p1, fontRegular, fontBold, 'Identificacion Catastral / CHIP', solicitud.predio.identificacionCatastral, 215, y, 185);
-  drawBoxField(p1, fontRegular, fontBold, 'Clasificacion de Suelo', solicitud.predio.clasificacionSuelo, 404, y, 172);
-  y -= 28;
-  drawBoxField(p1, fontRegular, fontBold, 'Barrio / Urbanizacion', solicitud.predio.barrio || 'N/A', 36, y, 140);
-  drawBoxField(p1, fontRegular, fontBold, 'Comuna / Localidad', solicitud.predio.comuna || 'N/A', 180, y, 140);
-  drawBoxField(p1, fontRegular, fontBold, 'Estrato', solicitud.predio.estrato ? String(solicitud.predio.estrato) : 'N/A', 324, y, 60);
-  drawBoxField(p1, fontRegular, fontBold, 'Manzana No.', solicitud.predio.manzanaNo || 'N/A', 388, y, 65);
-  drawBoxField(p1, fontRegular, fontBold, 'Lote No.', solicitud.predio.loteNo || 'N/A', 457, y, 65);
-  drawBoxField(p1, fontRegular, fontBold, 'Planimetria', solicitud.predio.planimetriaLote, 526, y, 50);
-
-  // ============================================================================
-  // PÁGINA 2: VECINOS, LINDEROS Y TITULARES
-  // ============================================================================
-  const p2 = doc.addPage([WIDTH, HEIGHT]);
-  const ctx2: RenderContext = { doc, page: p2, fontRegular, fontBold, width: WIDTH, height: HEIGHT };
-  drawHeader(ctx2, 2, 'VECINOS COLINDANTES, LINDEROS Y TITULARES');
-
-  y = HEIGHT - 85;
-
-  // SECCIÓN 3: INFORMACIÓN DE VECINOS COLINDANTES
-  y = drawSectionTitle(p2, fontBold, '3. INFORMACION DE VECINOS COLINDANTES (HASTA 8 PREDIOS)', y, WIDTH);
-  y -= 14;
-
-  // Table header for Vecinos
-  p2.drawRectangle({ x: 36, y: y - 2, width: WIDTH - 72, height: 14, color: PRIMARY_COLOR });
-  p2.drawText('#', { x: 44, y: y + 2, size: 7, font: fontBold, color: rgb(1, 1, 1) });
-  p2.drawText(cleanWinAnsi('DIRECCIÓN DEL PREDIO COLINDANTE'), { x: 75, y: y + 2, size: 7, font: fontBold, color: rgb(1, 1, 1) });
-  p2.drawText(cleanWinAnsi('DIRECCIÓN DE CORRESPONDENCIA / NOTIFICACIÓN'), { x: 320, y: y + 2, size: 7, font: fontBold, color: rgb(1, 1, 1) });
-  y -= 14;
-
-  for (let i = 0; i < 8; i++) {
-    const vecino = solicitud.vecinosColindantes?.[i];
-    const isEven = i % 2 === 0;
-    p2.drawRectangle({
-      x: 36,
-      y: y - 2,
-      width: WIDTH - 72,
-      height: 14,
-      borderWidth: 0.5,
-      borderColor: BORDER_COLOR,
-      color: isEven ? rgb(1, 1, 1) : rgb(0.97, 0.98, 1)
-    });
-    p2.drawText(String(i + 1), { x: 44, y: y + 2, size: 7, font: fontBold, color: PRIMARY_COLOR });
-    p2.drawText(cleanWinAnsi(vecino?.direccionPredio || '---'), { x: 75, y: y + 2, size: 7, font: fontRegular, color: TEXT_DARK });
-    p2.drawText(cleanWinAnsi(vecino?.direccionCorrespondencia || '---'), { x: 320, y: y + 2, size: 7, font: fontRegular, color: TEXT_DARK });
-    y -= 14;
-  }
-
-  // SECCIÓN 4: LINDEROS, DIMENSIONES Y ÁREAS
-  y -= 10;
-  y = drawSectionTitle(p2, fontBold, '4. LINDEROS, DIMENSIONES Y AREA TOTAL DEL PREDIO', y, WIDTH);
-  y -= 26;
-  drawBoxField(p2, fontRegular, fontBold, 'Lindero Norte (Longitud)', `${solicitud.linderos.norte.longitud} m`, 36, y, 140);
-  drawBoxField(p2, fontRegular, fontBold, 'Colinda al Norte con', solicitud.linderos.norte.colindaCon, 180, y, 396);
-  y -= 28;
-  drawBoxField(p2, fontRegular, fontBold, 'Lindero Sur (Longitud)', `${solicitud.linderos.sur.longitud} m`, 36, y, 140);
-  drawBoxField(p2, fontRegular, fontBold, 'Colinda al Sur con', solicitud.linderos.sur.colindaCon, 180, y, 396);
-  y -= 28;
-  drawBoxField(p2, fontRegular, fontBold, 'Lindero Oriente (Longitud)', `${solicitud.linderos.oriente.longitud} m`, 36, y, 140);
-  drawBoxField(p2, fontRegular, fontBold, 'Colinda al Oriente con', solicitud.linderos.oriente.colindaCon, 180, y, 396);
-  y -= 28;
-  drawBoxField(p2, fontRegular, fontBold, 'Lindero Occidente (Longitud)', `${solicitud.linderos.occidente.longitud} m`, 36, y, 140);
-  drawBoxField(p2, fontRegular, fontBold, 'Colinda al Occidente con', solicitud.linderos.occidente.colindaCon, 180, y, 396);
-  y -= 28;
-  drawBoxField(p2, fontRegular, fontBold, 'Area Total del Predio (m2)', `${solicitud.linderos.areaTotalPredio} m2`, 36, y, 220);
-  drawBoxField(p2, fontRegular, fontBold, 'Constancia Juridica', 'Linderos acordes con titulo de propiedad y folio de matricula inmobiliaria', 260, y, 316);
-
-  // SECCIÓN 5: TITULARES Y NOTIFICACIONES
-  y -= 20;
-  y = drawSectionTitle(p2, fontBold, '5. TITULARES DEL DERECHO DE DOMINIO Y AUTORIZACION', y, WIDTH);
-  y -= 14;
-
-  drawCheckItem(
-    p2,
-    fontRegular,
-    fontBold,
-    'Los titulares AUTORIZAN ser notificados electronicamente conforme al CPACA y Dec. 1077 de 2015.',
-    solicitud.titularesAceptanNotificacionElectronica,
-    36,
-    y,
-    WIDTH - 72
-  );
-
-  y -= 12;
-
-  const titulares = solicitud.titulares || [];
-  for (let i = 0; i < 4; i++) {
-    const tit = titulares[i];
-    y -= 36;
-    p2.drawRectangle({
-      x: 36,
-      y,
-      width: WIDTH - 72,
-      height: 34,
-      borderWidth: 0.6,
-      borderColor: BORDER_COLOR,
-      color: tit ? rgb(1, 1, 1) : rgb(0.98, 0.98, 0.98)
-    });
-
-    p2.drawText(cleanWinAnsi(`Titular ${i + 1}: ${tit ? tit.nombre : '(Casilla no utilizada)'}`), {
-      x: 44,
-      y: y + 22,
-      size: 7.5,
-      font: fontBold,
-      color: tit ? PRIMARY_COLOR : TEXT_MUTED
-    });
-
-    if (tit) {
-      p2.drawText(cleanWinAnsi(`CC/NIT: ${tit.ccNit}  |  Tel: ${tit.telefono}  |  Email: ${tit.correoElectronico}`), {
-        x: 44,
-        y: y + 10,
-        size: 7,
-        font: fontRegular,
-        color: TEXT_DARK
-      });
-      // Signature line placeholder
-      p2.drawLine({
-        start: { x: WIDTH - 180, y: y + 8 },
-        end: { x: WIDTH - 48, y: y + 8 },
-        thickness: 0.6,
-        color: TEXT_MUTED
-      });
-      p2.drawText('Firma del Titular', { x: WIDTH - 150, y: y + 1, size: 5.5, font: fontRegular, color: TEXT_MUTED });
-    }
-  }
-
-  // ============================================================================
-  // PÁGINA 3: PROFESIONALES RESPONSABLES Y RESPONSABLE DE LA SOLICITUD
-  // ============================================================================
-  const p3 = doc.addPage([WIDTH, HEIGHT]);
-  const ctx3: RenderContext = { doc, page: p3, fontRegular, fontBold, width: WIDTH, height: HEIGHT };
-  drawHeader(ctx3, 3, 'PROFESIONALES RESPONSABLES (LEY 1796 / NSR-10)');
-
-  y = HEIGHT - 85;
-
-  y = drawSectionTitle(p3, fontBold, '5.2 PROFESIONALES RESPONSABLES DEL PROYECTO', y, WIDTH);
-  y -= 12;
-
-  ROLES_PROFESIONALES.forEach((rol) => {
-    const prof = solicitud.profesionales?.[rol.key];
-    y -= 44;
-
-    p3.drawRectangle({
-      x: 36,
-      y,
-      width: WIDTH - 72,
-      height: 42,
-      borderWidth: 0.6,
-      borderColor: prof ? PRIMARY_COLOR : BORDER_COLOR,
-      color: prof ? rgb(1, 1, 1) : rgb(0.98, 0.98, 0.99)
-    });
-
-    // Rol title banner inside row
-    p3.drawRectangle({
-      x: 36,
-      y: y + 29,
-      width: WIDTH - 72,
-      height: 13,
-      color: SECONDARY_BG
-    });
-
-    p3.drawText(cleanWinAnsi(`${rol.label.toUpperCase()} (${rol.desc})`), {
-      x: 42,
-      y: y + 33,
-      size: 6.5,
-      font: fontBold,
-      color: PRIMARY_COLOR
-    });
-
-    if (prof) {
-      p3.drawText(cleanWinAnsi(`Nombre: ${prof.nombre}`), { x: 42, y: y + 17, size: 7, font: fontBold, color: TEXT_DARK });
-      p3.drawText(cleanWinAnsi(`C.C.: ${prof.cedula}`), { x: 260, y: y + 17, size: 7, font: fontRegular, color: TEXT_DARK });
-      p3.drawText(cleanWinAnsi(`Matricula Prof: ${prof.matriculaProfesional}`), { x: 370, y: y + 17, size: 7, font: fontRegular, color: TEXT_DARK });
-
-      p3.drawText(cleanWinAnsi(`Tel: ${prof.telefono}  |  Email: ${prof.correoElectronico}`), {
-        x: 42,
-        y: y + 5,
-        size: 6.5,
-        font: fontRegular,
-        color: TEXT_MUTED
-      });
-
-      if (prof.exigeSupervisionTecnica) {
-        p3.drawText('[X] Exige Supervision Tecnica Continua en Obra (Ley 1796 de 2016)', {
-          x: 310,
-          y: y + 5,
-          size: 6,
-          font: fontBold,
-          color: PRIMARY_COLOR
-        });
+/**
+ * Loads the official blank 4-page PDF template of the Formulario Único Nacional (Resolución 1051 de 2025).
+ * Preserves 100% of the authentic government design, layout, resolution text, logos, and borders.
+ */
+async function loadOfficialTemplateBytes(): Promise<Uint8Array> {
+  // Client-side browser execution
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/templates/formulario_unico_nacional_res_1051.pdf');
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        return new Uint8Array(buf);
       }
-    } else {
-      p3.drawText('No Aplica / No Designado para este tipo de tramite', {
-        x: 42,
-        y: y + 12,
-        size: 7,
-        font: fontRegular,
-        color: TEXT_MUTED
+    } catch {
+      // Fallback
+    }
+
+    try {
+      const resApi = await fetch('/api/template-pdf');
+      if (resApi.ok) {
+        const buf = await resApi.arrayBuffer();
+        return new Uint8Array(buf);
+      }
+    } catch {
+      // Fallback
+    }
+  } else {
+    // Node.js backend execution
+    const fs = await import('fs');
+    const path = await import('path');
+    const possiblePaths = [
+      path.resolve(process.cwd(), 'public/templates/formulario_unico_nacional_res_1051.pdf'),
+      path.resolve(process.cwd(), 'src/assets/formulario_unico_nacional_res_1051.pdf'),
+      path.resolve(process.cwd(), 'dist/templates/formulario_unico_nacional_res_1051.pdf'),
+      '/tmp/official_fun_1051.pdf'
+    ];
+
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return fs.readFileSync(p);
+      }
+    }
+  }
+
+  throw new Error('No se pudo encontrar la plantilla oficial del FUN (Resolución 1051 de 2025).');
+}
+
+/**
+ * Generates the completed Formulario Único Nacional (FUN) by loading the official 4-page
+ * MinVivienda template (Resolución 1051 de 2025) and stamping the user's data into the enabled fields.
+ */
+export async function generarFunPdfBytes(solicitud: FunSolicitudPayload): Promise<Uint8Array> {
+  const templateBytes = await loadOfficialTemplateBytes();
+  const pdfDoc = await PDFDocument.load(templateBytes);
+
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const pages = pdfDoc.getPages();
+  const page1 = pages[0];
+  const page2 = pages[1];
+  const page3 = pages[2];
+  const page4 = pages[3];
+
+  const colorBlack = rgb(0.05, 0.05, 0.05);
+
+  const stampText = (
+    page: PDFPage,
+    text: string | number | undefined | null,
+    x: number,
+    y: number,
+    size = 7.5,
+    isBold = false,
+    maxWidth?: number
+  ) => {
+    if (text === undefined || text === null || text === '') return;
+    const clean = cleanWinAnsi(String(text));
+    if (!clean) return;
+    const font = isBold ? fontBold : fontRegular;
+    let actualSize = size;
+    if (maxWidth) {
+      const textWidth = font.widthOfTextAtSize(clean, actualSize);
+      if (textWidth > maxWidth) {
+        actualSize = Math.max(5.5, (maxWidth / textWidth) * actualSize);
+      }
+    }
+    page.drawText(clean, {
+      x,
+      y,
+      size: actualSize,
+      font,
+      color: colorBlack
+    });
+  };
+
+  /**
+   * Stamps an 'X' centered inside a checkbox with given center coordinates (cx, cy)
+   */
+  const stampBoxCheck = (page: PDFPage, shouldCheck: boolean | undefined | null, cx: number, cy: number, size = 7.5) => {
+    if (!shouldCheck) return;
+    page.drawText('X', {
+      x: cx - 2.8,
+      y: cy - 2.8,
+      size,
+      font: fontBold,
+      color: colorBlack
+    });
+  };
+
+  // =========================================================================
+  // PÁGINA 1: GENERALIDADES, TRÁMITE, MODALIDADES Y PREDIO
+  // =========================================================================
+
+  // 0.1 OFICINA RESPONSABLE (celda entre x=180..527, baseline y=681.0)
+  stampText(page1, solicitud.general.autoridad || 'Curaduría Urbana', 185, 681, 7.5, true);
+
+  // 0.2 No. DE RADICACIÓN (12 casillas oficiales: Municipio[5] - Curaduría[1] - Año[2] - Consecutivo[4])
+  if (solicitud.general.radicacionNo) {
+    const rawDigits = solicitud.general.radicacionNo.replace(/[^0-9]/g, '');
+    const radBoxCentersX = [
+      316.9, 332.9, 349.0, 365.6, 381.7, // Municipio (5 dígitos)
+      404.2,                             // Curaduría (1 dígito)
+      426.8, 443.1,                      // Año (2 dígitos)
+      465.7, 482.3, 498.3, 514.7         // Consecutivo (4 dígitos)
+    ];
+    for (let i = 0; i < Math.min(rawDigits.length, radBoxCentersX.length); i++) {
+      page1.drawText(rawDigits[i], {
+        x: radBoxCentersX[i] - 2.8,
+        y: 664.8,
+        size: 8.5,
+        font: fontBold,
+        color: colorBlack
       });
+    }
+  }
+
+  // 0.3 DEPARTAMENTO - MUNICIPIO - FECHA (baseline y=647.5)
+  const depMunFecha = `${solicitud.general.departamento || ''}  -  ${solicitud.general.municipio || ''}  -  ${solicitud.general.fecha || ''}`;
+  stampText(page1, depMunFecha, 340, 647.5, 7.5, false);
+
+  // 1.1 TIPO DE TRÁMITE (casillas a la derecha en cx=252.3)
+  stampBoxCheck(page1, solicitud.identificacion.tipoTramite === 'URBANIZACION', 252.3, 606.0);
+  stampBoxCheck(page1, solicitud.identificacion.tipoTramite === 'PARCELACION', 252.3, 596.9);
+  stampBoxCheck(page1, solicitud.identificacion.tipoTramite === 'SUBDIVISION', 252.3, 587.8);
+  stampBoxCheck(page1, solicitud.identificacion.tipoTramite === 'CONSTRUCCION', 252.3, 578.6);
+  stampBoxCheck(page1, solicitud.identificacion.tipoTramite === 'ESPACIO_PUBLICO', 252.3, 565.7);
+  stampBoxCheck(page1, solicitud.identificacion.tipoTramite === 'RECONOCIMIENTO', 252.3, 549.4);
+  stampBoxCheck(page1, solicitud.identificacion.tipoTramite === 'OTRAS', 252.3, 536.9);
+
+  // 1.2 OBJETO DEL TRÁMITE (casillas a la derecha en cx=492.3)
+  stampBoxCheck(page1, solicitud.identificacion.objetoTramite === 'INICIAL', 492.3, 606.0);
+  stampBoxCheck(page1, solicitud.identificacion.objetoTramite === 'MODIFICACION', 492.3, 596.9);
+  stampBoxCheck(page1, solicitud.identificacion.objetoTramite === 'REVALIDACION', 492.3, 587.8);
+  if (solicitud.identificacion.objetoTramite === 'OTRAS') {
+    stampText(page1, solicitud.identificacion.objetoTramiteCual, 315, 548, 7, false);
+  }
+
+  // 1.3 MODALIDAD LICENCIA DE URBANIZACIÓN (casillas a la derecha en cx=252.3)
+  stampBoxCheck(page1, solicitud.identificacion.modalidadUrbanizacion === 'DESARROLLO', 252.3, 518.6);
+  stampBoxCheck(page1, solicitud.identificacion.modalidadUrbanizacion === 'SANEAMIENTO', 252.3, 509.5);
+  stampBoxCheck(page1, solicitud.identificacion.modalidadUrbanizacion === 'REURBANIZACION', 252.3, 499.9);
+
+  // 1.4 MODALIDAD LICENCIA DE SUBDIVISIÓN (casillas a la derecha en cx=252.3)
+  stampBoxCheck(page1, solicitud.identificacion.modalidadSubdivision === 'RURAL', 252.3, 481.2);
+  stampBoxCheck(page1, solicitud.identificacion.modalidadSubdivision === 'URBANA', 252.3, 472.1);
+  stampBoxCheck(page1, solicitud.identificacion.modalidadSubdivision === 'RELOTEO', 252.3, 463.0);
+
+  // 1.5 MODALIDAD LICENCIA DE CONSTRUCCIÓN
+  const modConst = solicitud.identificacion.modalidadesConstruccion || [];
+  // Columna izquierda (cx=368.0)
+  stampBoxCheck(page1, modConst.includes('OBRA_NUEVA'), 368.0, 518.6);
+  stampBoxCheck(page1, modConst.includes('AMPLIACION'), 368.0, 499.9);
+  stampBoxCheck(page1, modConst.includes('ADECUACION'), 368.0, 490.8);
+  stampBoxCheck(page1, modConst.includes('MODIFICACION'), 368.0, 481.2);
+  stampBoxCheck(page1, modConst.includes('RESTAURACION'), 368.0, 472.1);
+  // Columna derecha (cx=492.3)
+  stampBoxCheck(page1, modConst.includes('REFORZAMIENTO_ESTRUCTURAL'), 492.3, 518.6);
+  stampBoxCheck(page1, modConst.includes('DEMOLICION_TOTAL'), 492.3, 490.8);
+  stampBoxCheck(page1, modConst.includes('DEMOLICION_PARCIAL'), 492.3, 481.2);
+  stampBoxCheck(page1, modConst.includes('RECONSTRUCCION'), 492.3, 472.1);
+  stampBoxCheck(page1, modConst.includes('CERRAMIENTO'), 492.3, 463.0);
+
+  // 1.6 USOS (fila 1 cy=441.4, fila 2 cy=420.7)
+  const usos = solicitud.identificacion.usos || [];
+  stampBoxCheck(page1, usos.includes('VIVIENDA'), 73.7, 441.4);
+  stampBoxCheck(page1, usos.includes('COMERCIO_SERVICIOS'), 132.3, 441.4);
+  stampBoxCheck(page1, usos.includes('DOTACIONAL'), 197.6, 441.4);
+  stampBoxCheck(page1, usos.includes('INDUSTRIAL'), 73.7, 420.7);
+  stampBoxCheck(page1, usos.includes('OTRO'), 132.3, 420.7);
+  if (usos.includes('OTRO')) {
+    stampText(page1, solicitud.identificacion.usosOtroCual, 195, 417, 7, false);
+  }
+
+  // 1.7 ÁREA O UNIDADES CONSTRUIDA(S) (fila 1 cy=441.4, fila 2 cy=420.7)
+  const areaUnidades = solicitud.identificacion.areaUnidadesConstruidas;
+  stampBoxCheck(page1, areaUnidades === 'MENOR_2000', 377.1, 441.4);
+  stampBoxCheck(page1, areaUnidades === 'SUPERA_POR_AMPLIACION_2000', 506.3, 441.4);
+  stampBoxCheck(page1, areaUnidades === 'MAYOR_IGUAL_2000', 377.1, 420.7);
+  stampBoxCheck(page1, areaUnidades === 'CINCO_O_MAS_VIVIENDA', 506.3, 420.7);
+
+  // 1.8 TIPO DE VIVIENDA (cy=394.8)
+  stampBoxCheck(page1, solicitud.identificacion.tipoVivienda === 'VIP', 75.1, 394.8);
+  stampBoxCheck(page1, solicitud.identificacion.tipoVivienda === 'VIS', 134.7, 394.8);
+  stampBoxCheck(page1, solicitud.identificacion.tipoVivienda === 'NO_VIS', 200.9, 394.8);
+
+  // 1.9 BIEN DE INTERÉS CULTURAL (cy=394.8)
+  stampBoxCheck(page1, solicitud.identificacion.bienInteresCultural === true, 318.1, 394.8);
+  stampBoxCheck(page1, solicitud.identificacion.bienInteresCultural === false, 420.3, 394.8);
+
+  // 2. INFORMACIÓN SOBRE EL PREDIO
+  // 2.1 DIRECCIÓN O NOMENCLATURA (primera línea de escritura sobre el subrayado y=341.0)
+  stampText(page1, solicitud.predio.direccionActual, 85, 341.0, 7.5, true);
+  stampText(page1, solicitud.predio.direccionesAnteriores, 350, 341.0, 7.5, false);
+
+  // 2.2 MATRÍCULA INMOBILIARIA y 2.3 IDENTIFICACIÓN CATASTRAL (sobre el subrayado y=281.0)
+  stampText(page1, solicitud.predio.matriculaInmobiliaria, 85, 281.0, 8, true);
+  stampText(page1, solicitud.predio.identificacionCatastral, 350, 281.0, 8, true);
+
+  // 2.4 CLASIFICACIÓN DEL SUELO (casillas a la derecha en cx=272.9)
+  stampBoxCheck(page1, solicitud.predio.clasificacionSuelo === 'URBANO', 272.9, 242.6);
+  stampBoxCheck(page1, solicitud.predio.clasificacionSuelo === 'RURAL', 272.9, 233.5);
+  stampBoxCheck(page1, solicitud.predio.clasificacionSuelo === 'EXPANSION', 272.9, 224.4);
+
+  // 2.5 PLANIMETRÍA DEL LOTE (casillas a la derecha en cx=503.9)
+  stampBoxCheck(page1, solicitud.predio.planimetriaLote === 'PLANO_LOTEO', 503.9, 242.6);
+  stampBoxCheck(page1, solicitud.predio.planimetriaLote === 'PLANO_TOPOGRAFICO', 503.9, 234.0);
+  stampBoxCheck(page1, solicitud.predio.planimetriaLote === 'OTRO', 503.9, 224.9);
+  if (solicitud.predio.planimetriaLote === 'OTRO') {
+    stampText(page1, solicitud.predio.planimetriaOtroCual, 340, 211, 7, false);
+  }
+
+  // 2.6 INFORMACIÓN GENERAL DEL PREDIO (centrado en cada cuadrícula bajo el rótulo)
+  stampText(page1, solicitud.predio.barrio, 185, 168.0, 7.5, false);
+  stampText(page1, solicitud.predio.vereda, 360, 168.0, 7.5, false);
+  stampText(page1, solicitud.predio.comuna, 185, 145.0, 7.5, false);
+  stampText(page1, solicitud.predio.sector, 360, 145.0, 7.5, false);
+  stampText(page1, solicitud.predio.estrato ? String(solicitud.predio.estrato) : undefined, 185, 122.0, 8, true);
+  stampText(page1, solicitud.predio.corregimiento, 360, 122.0, 7.5, false);
+  stampText(page1, solicitud.predio.manzanaNo, 185, 98.0, 8, true);
+  stampText(page1, solicitud.predio.loteNo, 360, 98.0, 8, true);
+
+  // =========================================================================
+  // PÁGINA 2: VECINOS COLINDANTES, LINDEROS Y TITULARES
+  // =========================================================================
+
+  // 3. INFORMACIÓN DE VECINOS COLINDANTES (Hasta 8 vecinos en cuadrícula 2 columnas x 4 filas)
+  // Col 1: x = 105 (vecinos impares 1, 3, 5, 7)
+  // Col 2: x = 338 (vecinos pares 2, 4, 6, 8)
+  const vecinos = solicitud.vecinosColindantes || [];
+  const coordsVecinos: Array<{ xPredio: number; yPredio: number; xCorr: number; yCorr: number }> = [
+    { xPredio: 105, yPredio: 668.0, xCorr: 105, yCorr: 638.0 }, // Vecino 1 (Col 1, Fila 1)
+    { xPredio: 338, yPredio: 668.0, xCorr: 338, yCorr: 638.0 }, // Vecino 2 (Col 2, Fila 1)
+    { xPredio: 105, yPredio: 604.0, xCorr: 105, yCorr: 572.0 }, // Vecino 3 (Col 1, Fila 2)
+    { xPredio: 338, yPredio: 604.0, xCorr: 338, yCorr: 572.0 }, // Vecino 4 (Col 2, Fila 2)
+    { xPredio: 105, yPredio: 539.0, xCorr: 105, yCorr: 506.0 }, // Vecino 5 (Col 1, Fila 3)
+    { xPredio: 338, yPredio: 539.0, xCorr: 338, yCorr: 506.0 }, // Vecino 6 (Col 2, Fila 3)
+    { xPredio: 105, yPredio: 473.0, xCorr: 105, yCorr: 441.0 }, // Vecino 7 (Col 1, Fila 4)
+    { xPredio: 338, yPredio: 473.0, xCorr: 338, yCorr: 441.0 }, // Vecino 8 (Col 2, Fila 4)
+  ];
+
+  vecinos.slice(0, 8).forEach((vec, idx) => {
+    const c = coordsVecinos[idx];
+    if (c) {
+      stampText(page2, vec.direccionPredio, c.xPredio, c.yPredio, 7, false);
+      stampText(page2, vec.direccionCorrespondencia, c.xCorr, c.yCorr, 7, false);
     }
   });
 
-  // SECCIÓN 5.3 RESPONSABLE DE LA SOLICITUD
-  y -= 14;
-  y = drawSectionTitle(p3, fontBold, '5.3 RESPONSABLE DE LA SOLICITUD (APODERADO O MANDATARIO)', y, WIDTH);
-  y -= 26;
-  const resp = solicitud.responsableSolicitud;
-  drawBoxField(p3, fontRegular, fontBold, 'Nombre Completo o Razon Social', resp.nombre, 36, y, 270);
-  drawBoxField(p3, fontRegular, fontBold, 'Cedula de Ciudadania / NIT', resp.cedula, 310, y, 130);
-  drawBoxField(p3, fontRegular, fontBold, 'Telefono de Contacto', resp.telefono, 444, y, 132);
-  y -= 28;
-  drawBoxField(p3, fontRegular, fontBold, 'Direccion de Correspondencia Fisica', resp.direccionCorrespondencia, 36, y, 310);
-  drawBoxField(p3, fontRegular, fontBold, 'Correo Electronico para Notificaciones', resp.correoElectronico, 350, y, 226);
+  // 4. LINDEROS, DIMENSIONES Y ÁREAS
+  // Columnas oficiales:
+  // LINDEROS: 67.2 a 185.8 pt
+  // LONGITUD (Metros lineales): 185.8 a 299.1 pt (centrado/escritura en x = 210)
+  // COLINDA CON: 299.1 a 527.1 pt (escritura en x = 305)
+  if (solicitud.linderos) {
+    if (solicitud.linderos.norte) {
+      stampText(page2, `${solicitud.linderos.norte.longitud} m`, 210, 410.5, 7.5, true);
+      stampText(page2, solicitud.linderos.norte.colindaCon, 305, 410.5, 7.5, false);
+    }
+    if (solicitud.linderos.sur) {
+      stampText(page2, `${solicitud.linderos.sur.longitud} m`, 210, 377.0, 7.5, true);
+      stampText(page2, solicitud.linderos.sur.colindaCon, 305, 377.0, 7.5, false);
+    }
+    if (solicitud.linderos.oriente) {
+      stampText(page2, `${solicitud.linderos.oriente.longitud} m`, 210, 344.0, 7.5, true);
+      stampText(page2, solicitud.linderos.oriente.colindaCon, 305, 344.0, 7.5, false);
+    }
+    if (solicitud.linderos.occidente) {
+      stampText(page2, `${solicitud.linderos.occidente.longitud} m`, 210, 311.0, 7.5, true);
+      stampText(page2, solicitud.linderos.occidente.colindaCon, 305, 311.0, 7.5, false);
+    }
+    if (solicitud.linderos.areaTotalPredio !== undefined && solicitud.linderos.areaTotalPredio !== null) {
+      const areaValStr = typeof solicitud.linderos.areaTotalPredio === 'number'
+        ? solicitud.linderos.areaTotalPredio.toLocaleString('es-CO')
+        : String(solicitud.linderos.areaTotalPredio);
+      const textWidth = fontBold.widthOfTextAtSize(cleanWinAnsi(areaValStr), 8);
+      // El símbolo oficial 'm²' de la plantilla está al extremo derecho (x=513.7 a 527).
+      // Se posiciona el valor numérico al lado de m² (terminando a x=510 con un espacio de separación adecuado).
+      const xPos = Math.max(305, 510 - textWidth);
+      stampText(page2, areaValStr, xPos, 277.5, 8, true);
+    }
+  }
 
-  y -= 16;
-  drawCheckItem(
-    p3,
-    fontRegular,
-    fontBold,
-    'El responsable autoriza la notificacion electronica de todos los actos administrativos emitidos.',
-    resp.aceptaNotificacionElectronica,
-    36,
-    y,
-    WIDTH - 72
-  );
-
-  y -= 38;
-  p3.drawLine({ start: { x: 36, y }, end: { x: 260, y }, thickness: 0.8, color: TEXT_DARK });
-  p3.drawText('Firma del Responsable / Apoderado', { x: 36, y: y - 10, size: 7, font: fontBold, color: TEXT_DARK });
-  p3.drawText(cleanWinAnsi(`C.C. ${resp.cedula}`), { x: 36, y: y - 19, size: 6.5, font: fontRegular, color: TEXT_MUTED });
-
-  p3.drawLine({ start: { x: 320, y }, end: { x: WIDTH - 36, y }, thickness: 0.8, color: TEXT_DARK });
-  p3.drawText('Sello y Radicador de Curaduria Urbana / Autoridad Competente', { x: 320, y: y - 10, size: 7, font: fontBold, color: PRIMARY_COLOR });
-  p3.drawText('Fecha y Hora Oficial de Recepcion', { x: 320, y: y - 19, size: 6.5, font: fontRegular, color: TEXT_MUTED });
-
-  // ============================================================================
-  // PÁGINA 4: ANEXO DE CONSTRUCCIÓN SOSTENIBLE (RES. 0549/2015 Y 1051/2025)
-  // ============================================================================
-  const p4 = doc.addPage([WIDTH, HEIGHT]);
-  const ctx4: RenderContext = { doc, page: p4, fontRegular, fontBold, width: WIDTH, height: HEIGHT };
-  drawHeader(ctx4, 4, 'ANEXO DE CONSTRUCCION SOSTENIBLE');
-
-  y = HEIGHT - 85;
-
-  y = drawSectionTitle(p4, fontBold, 'ANEXO 1: PARAMETROS Y MEDIDAS DE CONSTRUCCION SOSTENIBLE', y, WIDTH);
-  y -= 14;
-
-  p4.drawText(cleanWinAnsi('Resolución 0549 de 2015 (Guía de Construcción Sostenible) reglamentada en el FUN Res. 1051 de 2025'), {
-    x: 36,
-    y,
-    size: 7.5,
-    font: fontRegular,
-    color: TEXT_MUTED
-  });
-
-  // Zonificación Climática
-  y -= 22;
-  p4.drawText(cleanWinAnsi('Zonificación Climática Oficial del Proyecto:'), { x: 36, y, size: 7.5, font: fontBold, color: PRIMARY_COLOR });
-  y -= 14;
-  const zonas: Array<{ key: string; label: string }> = [
-    { key: 'CALIDO_SECO', label: 'Cálido Seco' },
-    { key: 'CALIDO_HUMEDO', label: 'Cálido Húmedo' },
-    { key: 'TEMPLADO', label: 'Templado' },
-    { key: 'FRIO', label: 'Frío' }
+  // 5.1 TITULARES DE LA LICENCIA (hasta 4 titulares con nombre y datos)
+  // El rótulo '5.1 TITULAR (ES) DE LA LICENCIA' está en y = 244.8..236.2 pt (no escribir sobre él)
+  // Fila 1 (Nombre): x = 105, hasta x = 292 (antes de FIRMA que inicia en 299)
+  // Fila 2 (Datos): C.C. en x = 105, Teléfono en x = 250 (tras etiqueta 'TELÉFONO /CELULAR' que termina en x=247), Correo en x = 372
+  const titulares = solicitud.titulares || [];
+  const coordsTitulares = [
+    { yNombre: 224.0, yDatos: 212.0 }, // Titular 1
+    { yNombre: 195.0, yDatos: 182.0 }, // Titular 2
+    { yNombre: 165.0, yDatos: 153.0 }, // Titular 3
+    { yNombre: 135.0, yDatos: 123.0 }, // Titular 4
   ];
-  let zX = 36;
-  zonas.forEach((z) => {
-    drawCheckItem(p4, fontRegular, fontBold, z.label, solicitud.anexoConstruccionSostenible?.zonificacionClimatica === z.key, zX, y, 120);
-    zX += 135;
+
+  titulares.slice(0, 4).forEach((tit, idx) => {
+    const c = coordsTitulares[idx];
+    if (c) {
+      stampText(page2, tit.nombre, 105, c.yNombre, 7.5, true, 186);
+      stampText(page2, tit.ccNit, 105, c.yDatos, 7.5, false, 75);
+      stampText(page2, tit.telefono, 250, c.yDatos, 7, false, 46);
+      stampText(page2, tit.correoElectronico, 372, c.yDatos, 7, false, 150);
+    }
   });
 
-  // Medidas Pasivas
-  y -= 22;
-  y = drawSectionTitle(p4, fontBold, 'A. MEDIDAS PASIVAS DE EFICIENCIA ENERGETICA Y CONFORT TERMICO', y, WIDTH);
-  y -= 16;
-  const pas = solicitud.anexoConstruccionSostenible?.medidasPasivas || ({} as any);
-  drawCheckItem(p4, fontRegular, fontBold, 'Ventilación Natural Cruzada', !!pas.ventilacionNatural, 36, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Iluminación Natural Óptima', !!pas.iluminacionNatural, 220, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Orientación Solar Favorable', !!pas.orientacionSolar, 400, y, 160);
-  y -= 16;
-  drawCheckItem(p4, fontRegular, fontBold, 'Aleros, Sombrillas y Persianas', !!pas.alerosYSombrillas, 36, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Aislamiento Térmico en Envolvente', !!pas.aislamientoTermico, 220, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Aprovechamiento de Masa Térmica', !!pas.masaTermica, 400, y, 160);
+  // Notificación electrónica titulares (casillas en cx=441.9 [SI] y cx=477.5 [NO], cy=111.1)
+  stampBoxCheck(page2, solicitud.titularesAceptanNotificacionElectronica === true, 441.9, 111.1);
+  stampBoxCheck(page2, solicitud.titularesAceptanNotificacionElectronica === false, 477.5, 111.1);
 
-  // Medidas Activas
-  y -= 24;
-  y = drawSectionTitle(p4, fontBold, 'B. MEDIDAS ACTIVAS Y SISTEMAS EFICIENTES', y, WIDTH);
-  y -= 16;
-  const act = solicitud.anexoConstruccionSostenible?.medidasActivas || ({} as any);
-  drawCheckItem(p4, fontRegular, fontBold, 'Iluminación LED de Alta Eficiencia', !!act.iluminacionLedEficiente, 36, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Sensores de Ocupación / Presencia', !!act.sensoresPresencia, 220, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Climatización con Inverter / VRF', !!act.equiposClimatizacionInverter, 400, y, 160);
-  y -= 16;
-  drawCheckItem(p4, fontRegular, fontBold, 'Energía Solar Fotovoltaica', !!act.energiaSolarFotovoltaica, 36, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Colectores Solares Térmicos', !!act.colectoresSolaresTermicos, 220, y, 180);
-  drawCheckItem(p4, fontRegular, fontBold, 'Griferías y Sanitarios de Bajo Consumo', !!act.griferiasAhorroAgua, 400, y, 160);
-  y -= 16;
-  drawCheckItem(p4, fontRegular, fontBold, 'Sistema de Captación y Reúso de Agua Lluvia', !!act.reusoAguaLluvia, 36, y, 300);
+  // =========================================================================
+  // PÁGINA 3: PROFESIONALES RESPONSABLES Y RESPONSABLE DE LA SOLICITUD
+  // =========================================================================
 
-  // Ahorros esperados
-  y -= 24;
-  y = drawSectionTitle(p4, fontBold, 'C. PORCENTAJES DE AHORRO ESTIMADOS (RES. 0549 DE 2015)', y, WIDTH);
-  y -= 26;
-  drawBoxField(
-    p4,
-    fontRegular,
-    fontBold,
-    'Porcentaje Estimado de Ahorro en Agua',
-    `${solicitud.anexoConstruccionSostenible?.porcentajeAhorroAguaEsperado || 0} % (Minimo exigido: 20%)`,
-    36,
-    y,
-    260
-  );
-  drawBoxField(
-    p4,
-    fontRegular,
-    fontBold,
-    'Porcentaje Estimado de Ahorro en Energia',
-    `${solicitud.anexoConstruccionSostenible?.porcentajeAhorroEnergiaEsperado || 0} % (Minimo exigido: 20%)`,
-    306,
-    y,
-    270
-  );
+  const profs = solicitud.profesionales || {};
 
-  // Descripción complementaria
-  y -= 24;
-  y = drawSectionTitle(p4, fontBold, 'D. MEMORIA Y JUSTIFICACION TECNICA DE CONSTRUCCION SOSTENIBLE', y, WIDTH);
-  y -= 60;
-  p4.drawRectangle({
-    x: 36,
-    y,
-    width: WIDTH - 72,
-    height: 56,
-    borderWidth: 0.6,
-    borderColor: BORDER_COLOR,
-    color: rgb(1, 1, 1)
-  });
-  const rawDesc = solicitud.anexoConstruccionSostenible?.descripcionMedidasAdicionales || 'Se cumple con las especificaciones de la Guia de Construccion Sostenible adoptada por el Ministerio de Vivienda.';
-  const desc = cleanWinAnsi(rawDesc);
-  p4.drawText(desc.substring(0, 360), {
-    x: 42,
-    y: y + 42,
-    size: 7,
-    font: fontRegular,
-    color: TEXT_DARK,
-    maxWidth: WIDTH - 84,
-    lineHeight: 10
+  // Configuración de los 10 roles profesionales oficiales con sus 3 renglones exactos
+  // Renglón 1 (Nombre): x = 180 (tras etiqueta NOMBRE)
+  // Renglón 2 (Cédula / Matrícula / Fecha): Cédula x = 175, Matrícula x = 315, Fecha x = 445
+  // Renglón 3 (Correo / Teléfono): Correo x = 215, Teléfono x = 375
+  const rolesConfig: Array<{
+    keys: string[];
+    yNombre: number;
+    yCedulaMat: number;
+    yCorreoTel: number;
+    hasSupervision?: boolean;
+    xSupSi?: number;
+    xSupNo?: number;
+    ySup?: number;
+  }> = [
+    { keys: ['urbanizador', 'URBANIZADOR_PARCELADOR'], yNombre: 673.0, yCedulaMat: 657.0, yCorreoTel: 642.0 },
+    { keys: ['directorConstruccion', 'DIRECTOR_CONSTRUCCION'], yNombre: 620.0, yCedulaMat: 604.0, yCorreoTel: 589.0 },
+    { keys: ['arquitectoProyectista', 'ARQUITECTO_PROYECTISTA'], yNombre: 566.0, yCedulaMat: 550.0, yCorreoTel: 535.0 },
+    { keys: ['disenadorEstructural', 'INGENIERO_ESTRUCTURAL'], yNombre: 511.0, yCedulaMat: 495.0, yCorreoTel: 480.0, hasSupervision: true, xSupSi: 480.8, xSupNo: 505.8, ySup: 499.9 },
+    { keys: ['disenadorElementosNoEstructurales', 'DISENADOR_NO_ESTRUCTURAL'], yNombre: 456.0, yCedulaMat: 440.0, yCorreoTel: 425.0 },
+    { keys: ['ingenieroGeotecnista', 'INGENIERO_GEOTECNISTA'], yNombre: 401.0, yCedulaMat: 385.0, yCorreoTel: 370.0, hasSupervision: true, xSupSi: 480.8, xSupNo: 505.8, ySup: 390.5 },
+    { keys: ['topografo', 'TOPOGRAFO'], yNombre: 346.0, yCedulaMat: 330.0, yCorreoTel: 315.0 },
+    { keys: ['revisorEstructuralIndependiente', 'REVISOR_ESTRUCTURAL_INDEPENDIENTE'], yNombre: 292.0, yCedulaMat: 276.0, yCorreoTel: 260.0 },
+    { keys: ['otrosEspecialistas1', 'ESPECIALISTA_1'], yNombre: 237.0, yCedulaMat: 221.0, yCorreoTel: 206.0 },
+    { keys: ['otrosEspecialistas2', 'ESPECIALISTA_2'], yNombre: 182.0, yCedulaMat: 166.0, yCorreoTel: 151.0 },
+  ];
+
+  rolesConfig.forEach((cfg) => {
+    let prof = undefined;
+    for (const k of cfg.keys) {
+      if (profs[k]) {
+        prof = profs[k];
+        break;
+      }
+    }
+    if (prof && prof.nombre) {
+      stampText(page3, prof.nombre, 180, cfg.yNombre, 7.5, true);
+      stampText(page3, prof.cedula, 175, cfg.yCedulaMat, 7.5, false);
+      stampText(page3, prof.matriculaProfesional, 315, cfg.yCedulaMat, 7.5, false);
+      stampText(page3, prof.fechaExpedicionMatricula, 445, cfg.yCedulaMat, 7, false);
+      stampText(page3, prof.correoElectronico, 215, cfg.yCorreoTel, 7, false);
+      stampText(page3, prof.telefono, 375, cfg.yCorreoTel, 7.5, false);
+
+      if (cfg.hasSupervision && cfg.xSupSi && cfg.xSupNo && cfg.ySup) {
+        stampBoxCheck(page3, prof.exigeSupervisionTecnica === true, cfg.xSupSi, cfg.ySup);
+        stampBoxCheck(page3, prof.exigeSupervisionTecnica === false, cfg.xSupNo, cfg.ySup);
+      }
+    }
   });
 
-  // Firmas finales de responsabilidad técnica
-  y -= 50;
-  p4.drawLine({ start: { x: 36, y }, end: { x: 260, y }, thickness: 0.8, color: TEXT_DARK });
-  p4.drawText('Firma del Diseñador / Profesional Especialista en Sostenibilidad', { x: 36, y: y - 10, size: 7, font: fontBold, color: TEXT_DARK });
-  p4.drawText('Matrícula Profesional y Certificación Energética', { x: 36, y: y - 19, size: 6.5, font: fontRegular, color: TEXT_MUTED });
+  // 5.3 RESPONSABLE DE LA SOLICITUD
+  if (solicitud.responsableSolicitud) {
+    const resp = solicitud.responsableSolicitud;
+    stampText(page3, resp.nombre, 180, 122.0, 7.5, true);
+    stampText(page3, resp.cedula, 180, 106.5, 7.5, false);
+    stampText(page3, resp.telefono, 445, 106.5, 7.5, false);
+    stampText(page3, resp.direccionCorrespondencia, 265, 80.0, 7.5, false);
+    stampText(page3, resp.correoElectronico, 445, 80.0, 7, false);
+    // Notificación electrónica solicitante (cx=441.9 [SI], cx=477.5 [NO], cy=68.0)
+    stampBoxCheck(page3, resp.aceptaNotificacionElectronica === true, 441.9, 68.0);
+    stampBoxCheck(page3, resp.aceptaNotificacionElectronica === false, 477.5, 68.0);
+  }
 
-  p4.drawLine({ start: { x: 320, y }, end: { x: WIDTH - 36, y }, thickness: 0.8, color: TEXT_DARK });
-  p4.drawText('Firma del Titular / Propietario del Proyecto', { x: 320, y: y - 10, size: 7, font: fontBold, color: PRIMARY_COLOR });
-  p4.drawText('Aceptación de cumplimiento de estándares ambientales y urbanísticos', { x: 320, y: y - 19, size: 6.5, font: fontRegular, color: TEXT_MUTED });
+  // =========================================================================
+  // PÁGINA 4: ANEXO DE CONSTRUCCIÓN SOSTENIBLE (RESOLUCIÓN 0549 DE 2015)
+  // =========================================================================
 
-  return await doc.save();
+  const anexo = solicitud.anexoConstruccionSostenible || {};
+
+  // Usos de la edificación en el anexo
+  const usosAnexo = usos || [];
+  stampBoxCheck(page4, usosAnexo.includes('VIVIENDA'), 150.0, 681.8);
+  stampBoxCheck(page4, usosAnexo.includes('DOTACIONAL'), 278.2, 681.8);
+  stampBoxCheck(page4, usosAnexo.includes('COMERCIO_SERVICIOS'), 385.3, 681.8);
+  stampBoxCheck(page4, usosAnexo.includes('INDUSTRIAL'), 148.6, 663.6);
+  stampBoxCheck(page4, usosAnexo.includes('OTRO'), 410.7, 663.6);
+
+  // 2.1.1 Medidas Pasivas de Ahorro en Energía (columna izquierda en cx=277.3)
+  const pasivas = anexo.medidasPasivas || ({} as any);
+  stampBoxCheck(page4, pasivas.cubiertaVerde || pasivas.aislamientoTermico, 277.3, 618.0);
+  stampBoxCheck(page4, pasivas.elementosProteccionSolar || pasivas.alerosYSombrillas, 277.3, 608.9);
+  stampBoxCheck(page4, pasivas.vidriosProteccionSolar, 277.3, 599.8);
+  stampBoxCheck(page4, pasivas.cubiertaProteccionSolar, 277.3, 590.6);
+  stampBoxCheck(page4, pasivas.paredProteccionSolar || pasivas.masaTermica, 277.3, 581.5);
+  stampBoxCheck(page4, pasivas.otro, 277.3, 572.4);
+  if (pasivas.otro && pasivas.otroCual) {
+    stampText(page4, pasivas.otroCual, 160, 568, 6.5, false);
+  }
+
+  // 2.1.2 Medidas Activas de Ahorro en Energía (columna derecha en cx=502.9)
+  const activas = anexo.medidasActivas || ({} as any);
+  stampBoxCheck(page4, activas.iluminacionEficiente || activas.iluminacionLedEficiente, 502.9, 618.0);
+  stampBoxCheck(page4, activas.equiposAireEficientes || activas.equiposClimatizacionInverter, 502.9, 608.9);
+  stampBoxCheck(page4, activas.aguaCalienteSolar || activas.colectoresSolaresTermicos, 502.9, 599.8);
+  stampBoxCheck(page4, activas.controlesIluminacion || activas.sensoresPresencia, 502.9, 590.6);
+  stampBoxCheck(page4, activas.variadoresVelocidadBombas, 502.9, 581.5);
+  stampBoxCheck(page4, activas.otro, 502.9, 572.4);
+  if (activas.otro && activas.otroCual) {
+    stampText(page4, activas.otroCual, 430, 568, 6.5, false);
+  }
+
+  // 2.2 Materialidad Muro Externo (columna izquierda en cx=277.3)
+  const matExt = anexo.materialidadMuroExterno;
+  stampBoxCheck(page4, matExt === 'ladrillo_portante', 277.3, 539.8);
+  stampBoxCheck(page4, matExt === 'ladrillo_comun', 277.3, 530.6);
+  stampBoxCheck(page4, matExt === 'concreto_vaciado', 277.3, 521.3);
+  stampBoxCheck(page4, matExt === 'superboard', 277.3, 512.2);
+  stampBoxCheck(page4, matExt === 'muro_cortina_aluminio', 277.3, 503.0);
+  stampBoxCheck(page4, matExt === 'otro', 277.3, 493.9);
+
+  // 2.3 Materialidad Muro Interno (columna derecha en cx=502.9)
+  const matInt = anexo.materialidadMuroInterno;
+  stampBoxCheck(page4, matInt === 'ladrillo_numero_4', 502.9, 539.8);
+  stampBoxCheck(page4, matInt === 'drywall', 502.9, 530.6);
+  stampBoxCheck(page4, matInt === 'ladrillo_comun', 502.9, 521.3);
+  stampBoxCheck(page4, matInt === 'concreto_vaciado', 502.9, 512.2);
+  stampBoxCheck(page4, matInt === 'bloque_concreto', 502.9, 503.0);
+  stampBoxCheck(page4, matInt === 'otro', 502.9, 493.9);
+
+  // 2.4 Materialidad Cubierta (columna izquierda en cx=277.3)
+  const matCub = anexo.materialidadCubierta;
+  stampBoxCheck(page4, matCub === 'concreto_vaciado', 277.3, 475.4);
+  stampBoxCheck(page4, matCub === 'panel_sandwich', 277.3, 465.6);
+  stampBoxCheck(page4, matCub === 'tejas_arcilla', 277.3, 455.8);
+  stampBoxCheck(page4, matCub === 'metalica', 277.3, 446.2);
+  stampBoxCheck(page4, matCub === 'fibrocemento', 277.3, 436.3);
+  stampBoxCheck(page4, matCub === 'otro', 277.3, 426.5);
+
+  // 2.5 Relación Muro Ventana (Rango 0% - 100%) y Altura Piso a Techo
+  const relMuroVentana = anexo.relacionMuroVentana || {};
+  stampText(page4, relMuroVentana.norte !== undefined ? `${relMuroVentana.norte}%` : undefined, 435, 473.0, 7.5, false);
+  stampText(page4, relMuroVentana.sur !== undefined ? `${relMuroVentana.sur}%` : undefined, 435, 462.0, 7.5, false);
+  stampText(page4, relMuroVentana.oriente !== undefined ? `${relMuroVentana.oriente}%` : undefined, 435, 451.0, 7.5, false);
+  stampText(page4, relMuroVentana.occidente !== undefined ? `${relMuroVentana.occidente}%` : undefined, 435, 440.0, 7.5, false);
+  stampText(page4, relMuroVentana.alturaPisoTecho !== undefined ? `${relMuroVentana.alturaPisoTecho} m` : undefined, 515, 456.0, 7.5, false);
+
+  // 2.6 Declaración sobre Medidas de Ahorro en Agua (columna izquierda en cx=277.3)
+  const agua = anexo.medidasAhorroAgua || ({} as any);
+  stampBoxCheck(page4, agua.sanitariosBajoConsumo, 277.3, 408.2);
+  stampBoxCheck(page4, agua.lavamanosBajoConsumo || activas.griferiasAhorroAgua, 277.3, 399.1);
+  stampBoxCheck(page4, agua.duchasBajoConsumo, 277.3, 390.0);
+  stampBoxCheck(page4, agua.orinalesBajoConsumo, 277.3, 380.6);
+  stampBoxCheck(page4, agua.recoleccionAguaLluvia || activas.reusoAguaLluvia, 277.3, 371.5);
+  stampBoxCheck(page4, agua.otro, 277.3, 362.4);
+
+  // 2.7 Zonificación Climática (fila en cy=394.3)
+  const clima = anexo.zonificacionClimatica;
+  stampBoxCheck(page4, clima === 'FRIO', 310.4, 394.3);
+  stampBoxCheck(page4, clima === 'TEMPLADO', 356.5, 394.3);
+  stampBoxCheck(page4, clima === 'CALIDO_SECO', 421.3, 394.3);
+  stampBoxCheck(page4, clima === 'CALIDO_HUMEDO', 473.4, 394.3);
+
+  // 2.8 y 2.9 Ahorros Esperados en Agua y Energía (sobre el renglón correspondiente)
+  stampText(page4, anexo.porcentajeAhorroAguaEsperado !== undefined ? `${anexo.porcentajeAhorroAguaEsperado}%` : undefined, 200, 341.0, 8, true);
+  stampText(page4, anexo.porcentajeAhorroEnergiaEsperado !== undefined ? `${anexo.porcentajeAhorroEnergiaEsperado}%` : undefined, 450, 341.0, 8, true);
+
+  // Áreas Netas (Res. 0549 de 2015)
+  stampText(page4, anexo.areaNetaUrbanismoPaisajismo !== undefined ? `${anexo.areaNetaUrbanismoPaisajismo} m2` : undefined, 420, 301.0, 7.5, false);
+  stampText(page4, anexo.areaNetaZonasComunes !== undefined ? `${anexo.areaNetaZonasComunes} m2` : undefined, 420, 289.0, 7.5, false);
+  stampText(page4, anexo.areaNetaParqueaderos !== undefined ? `${anexo.areaNetaParqueaderos} m2` : undefined, 420, 277.0, 7.5, false);
+
+  // Return generated filled official PDF bytes
+  return await pdfDoc.save();
 }

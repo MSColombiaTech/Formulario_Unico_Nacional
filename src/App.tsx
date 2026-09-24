@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FunSolicitudPayload } from './types/fun';
-import { EJEMPLO_FUN_BOGOTA, ESTADO_INICIAL_FUN } from './utils/colombiaData';
+import { EJEMPLO_FUN_BOGOTA } from './utils/colombiaData';
 import { generarFunPdfBytes } from './utils/pdfGenerator';
 import { Header } from './components/Header';
 import { StepNavigation } from './components/StepNavigation';
@@ -10,10 +10,12 @@ import { Step3Personas } from './components/Step3Personas';
 import { Step4Sostenible } from './components/Step4Sostenible';
 import { Step5Revision } from './components/Step5Revision';
 import { SqlModal } from './components/SqlModal';
+import { useAuth } from './context/AuthContext';
 
 const STORAGE_KEY = 'fun_solicitud_draft_v1';
 
 export function App() {
+  const { getIdToken } = useAuth();
   const [solicitud, setSolicitud] = useState<FunSolicitudPayload>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -29,22 +31,31 @@ export function App() {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([1, 2, 3, 4]);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
+  const [isSavingCloudSql, setIsSavingCloudSql] = useState<boolean>(false);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(solicitud));
-    } catch (e) {
-      console.error('Error guardando en localStorage', e);
-    }
+    setSaveStatus('saving');
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(solicitud));
+        setSaveStatus('saved');
+      } catch (e) {
+        console.error('Error guardando en localStorage', e);
+        setSaveStatus('saved');
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
   }, [solicitud]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((cur) => (cur === msg ? null : cur));
-    }, 4000);
+    }, 4500);
   };
 
   const handleCargarEjemplo = () => {
@@ -58,12 +69,55 @@ export function App() {
     showToast('¡Solicitud FUN importada correctamente!');
   };
 
+  const handleGuardarCloudSql = async () => {
+    setIsSavingCloudSql(true);
+    try {
+      const token = await getIdToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch('/api/solicitudes', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(solicitud),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al guardar en Google Cloud SQL');
+      }
+
+      showToast(`¡Solicitud guardada en Google Cloud SQL con ID: ${data.id || 'registrada'}!`);
+    } catch (err: any) {
+      console.error('Error al guardar en base de datos:', err);
+      showToast(err?.message || 'Error al conectar con Google Cloud SQL');
+    } finally {
+      setIsSavingCloudSql(false);
+    }
+  };
+
   const handleDescargarPdf = async () => {
     setIsGeneratingPdf(true);
     try {
-      // First try local pdf-lib generation
-      const pdfBytes = await generarFunPdfBytes(solicitud);
-      const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
+      let blob: Blob;
+      try {
+        const pdfBytes = await generarFunPdfBytes(solicitud);
+        blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      } catch (localErr) {
+        console.warn('Fallback a generación PDF en servidor:', localErr);
+        const res = await fetch('/api/generate-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(solicitud)
+        });
+        if (!res.ok) throw new Error('Error en servidor al generar PDF');
+        blob = await res.blob();
+      }
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -91,11 +145,14 @@ export function App() {
       {/* Header */}
       <Header
         solicitud={solicitud}
+        saveStatus={saveStatus}
         onCargarEjemplo={handleCargarEjemplo}
         onImportarJson={handleImportarJson}
         onOpenSqlModal={() => setIsSqlModalOpen(true)}
         onDescargarPdf={handleDescargarPdf}
         isGeneratingPdf={isGeneratingPdf}
+        onGuardarCloudSql={handleGuardarCloudSql}
+        isSavingCloudSql={isSavingCloudSql}
       />
 
       {/* Progress Step Bar */}
@@ -172,6 +229,8 @@ export function App() {
             solicitud={solicitud}
             onDescargarPdf={handleDescargarPdf}
             onOpenSqlModal={() => setIsSqlModalOpen(true)}
+            onGuardarCloudSql={handleGuardarCloudSql}
+            isSavingCloudSql={isSavingCloudSql}
             onBack={() => {
               setCurrentStep(4);
               window.scrollTo({ top: 0, behavior: 'smooth' });

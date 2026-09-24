@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FunSolicitudPayload } from '../types/fun';
 import { funSolicitudSchema } from '../utils/schemaValidation';
+import { FormularioOficialModal } from './FormularioOficialModal';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -11,7 +12,7 @@ import {
   Users,
   Leaf,
   Layers,
-  Sparkles
+  Eye
 } from 'lucide-react';
 
 interface Step5Props {
@@ -21,6 +22,8 @@ interface Step5Props {
   onBack: () => void;
   isGeneratingPdf: boolean;
   onGoToStep: (step: number) => void;
+  onGuardarCloudSql?: () => void;
+  isSavingCloudSql?: boolean;
 }
 
 export const Step5Revision: React.FC<Step5Props> = ({
@@ -29,8 +32,12 @@ export const Step5Revision: React.FC<Step5Props> = ({
   onOpenSqlModal,
   onBack,
   isGeneratingPdf,
-  onGoToStep
+  onGoToStep,
+  onGuardarCloudSql,
+  isSavingCloudSql = false
 }) => {
+  const [isFormularioModalOpen, setIsFormularioModalOpen] = useState(false);
+
   // Validation with Zod
   const validationResult = useMemo(() => {
     return funSolicitudSchema.safeParse(solicitud);
@@ -61,14 +68,35 @@ export const Step5Revision: React.FC<Step5Props> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsFormularioModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-white shadow-xs transition-colors"
+            >
+              <Eye className="w-4 h-4 text-sky-400" />
+              <span>Ver Formulario Oficial</span>
+            </button>
+
+            {onGuardarCloudSql && (
+              <button
+                type="button"
+                onClick={onGuardarCloudSql}
+                disabled={isSavingCloudSql}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm disabled:opacity-50"
+              >
+                <Database className="w-4 h-4 text-emerald-200" />
+                <span>{isSavingCloudSql ? 'Guardando en Cloud SQL...' : 'Guardar en Google Cloud SQL'}</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onOpenSqlModal}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs bg-indigo-50 text-indigo-800 border border-indigo-300 hover:bg-indigo-100 transition-colors"
             >
-              <Database className="w-4 h-4 text-emerald-600" />
-              <span>Esquema SQL Supabase</span>
+              <Database className="w-4 h-4 text-indigo-600" />
+              <span>Google DB (SQL)</span>
             </button>
 
             <button
@@ -367,6 +395,15 @@ export const Step5Revision: React.FC<Step5Props> = ({
           {isGeneratingPdf ? 'Generando PDF...' : 'Generar y Descargar FUN Oficial'}
         </button>
       </div>
+
+      {/* Official Form Full Interactive Preview Modal */}
+      <FormularioOficialModal
+        isOpen={isFormularioModalOpen}
+        onClose={() => setIsFormularioModalOpen(false)}
+        solicitud={solicitud}
+        onDescargarPdf={onDescargarPdf}
+        isGeneratingPdf={isGeneratingPdf}
+      />
     </div>
   );
 };

@@ -111,5 +111,5 @@ export const funSolicitudSchema = z.object({
     porcentajeAhorroAguaEsperado: z.number().min(0).max(100),
     porcentajeAhorroEnergiaEsperado: z.number().min(0).max(100),
     descripcionMedidasAdicionales: z.string().optional()
-  })
+  }).passthrough()
 });

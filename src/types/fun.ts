@@ -84,6 +84,10 @@ export interface ProfesionalInfo {
 
 export interface AnexoConstruccionSostenible {
   zonificacionClimatica: 'CALIDO_SECO' | 'CALIDO_HUMEDO' | 'TEMPLADO' | 'FRIO';
+  zonaClimaticaDistinta?: {
+    esDistinta: boolean;
+    cual?: string;
+  };
   medidasPasivas: {
     ventilacionNatural: boolean;
     iluminacionNatural: boolean;
@@ -91,6 +95,13 @@ export interface AnexoConstruccionSostenible {
     alerosYSombrillas: boolean;
     aislamientoTermico: boolean;
     masaTermica: boolean;
+    cubiertaVerde?: boolean;
+    elementosProteccionSolar?: boolean;
+    vidriosProteccionSolar?: boolean;
+    cubiertaProteccionSolar?: boolean;
+    paredProteccionSolar?: boolean;
+    otro?: boolean;
+    otroCual?: string;
   };
   medidasActivas: {
     iluminacionLedEficiente: boolean;
@@ -100,9 +111,41 @@ export interface AnexoConstruccionSostenible {
     colectoresSolaresTermicos: boolean;
     griferiasAhorroAgua: boolean;
     reusoAguaLluvia: boolean;
+    iluminacionEficiente?: boolean;
+    equiposAireEficientes?: boolean;
+    aguaCalienteSolar?: boolean;
+    controlesIluminacion?: boolean;
+    variadoresVelocidadBombas?: boolean;
+    otro?: boolean;
+    otroCual?: string;
+  };
+  medidasAhorroAgua?: {
+    sanitariosBajoConsumo?: boolean;
+    lavamanosBajoConsumo?: boolean;
+    duchasBajoConsumo?: boolean;
+    orinalesBajoConsumo?: boolean;
+    recoleccionAguaLluvia?: boolean;
+    otro?: boolean;
+    otroCual?: string;
+  };
+  materialidadMuroExterno?: 'ladrillo_portante' | 'ladrillo_comun' | 'concreto_vaciado' | 'superboard' | 'muro_cortina_aluminio' | 'otro';
+  materialidadMuroExternoCual?: string;
+  materialidadMuroInterno?: 'ladrillo_numero_4' | 'drywall' | 'ladrillo_comun' | 'concreto_vaciado' | 'bloque_concreto' | 'otro';
+  materialidadMuroInternoCual?: string;
+  materialidadCubierta?: 'concreto_vaciado' | 'panel_sandwich' | 'tejas_arcilla' | 'metalica' | 'fibrocemento' | 'otro';
+  materialidadCubiertaCual?: string;
+  relacionMuroVentana?: {
+    norte?: number;
+    sur?: number;
+    oriente?: number;
+    occidente?: number;
+    alturaPisoTecho?: number;
   };
   porcentajeAhorroAguaEsperado: number;
   porcentajeAhorroEnergiaEsperado: number;
+  areaNetaUrbanismoPaisajismo?: number;
+  areaNetaZonasComunes?: number;
+  areaNetaParqueaderos?: number;
   descripcionMedidasAdicionales?: string;
 }
 
@@ -167,12 +210,14 @@ export interface FunSolicitudPayload {
 }
 
 export const ROLES_PROFESIONALES: Array<{ key: string; label: string; desc: string; obligatorio: boolean; exigeSupervisionPosible?: boolean }> = [
-  { key: 'urbanizador', label: 'Urbanizador o Constructor Responsable', desc: 'Ingeniero Civil o Arquitecto', obligatorio: true },
-  { key: 'directorConstruccion', label: 'Director de la Construcción', desc: 'Ingeniero Civil o Arquitecto con experiencia mínima de 3 años', obligatorio: true },
-  { key: 'arquitectoProyectista', label: 'Arquitecto Proyectista', desc: 'Diseñador Arquitectónico del proyecto', obligatorio: true },
-  { key: 'disenadorEstructural', label: 'Diseñador Estructural', desc: 'Ingeniero Civil matriculado con experiencia acreditada', obligatorio: true },
-  { key: 'disenadorElementosNoEstructurales', label: 'Diseñador Elementos No Estructurales', desc: 'Ingeniero o Arquitecto', obligatorio: false },
-  { key: 'ingenieroGeotecnista', label: 'Ingeniero Geotecnista', desc: 'Estudio de suelos y geotecnia', obligatorio: true },
-  { key: 'revisorEstructuralIndependiente', label: 'Revisor Independiente de Diseños Estructurales', desc: 'Obligatorio según Ley 1796 de 2016 (Vivienda Segura) si supera 2000m²', obligatorio: false },
-  { key: 'supervisorTecnicoIndependiente', label: 'Supervisor Técnico Independiente', desc: 'Supervisión técnica continua en obra (Ley 1796)', obligatorio: false, exigeSupervisionPosible: true }
+  { key: 'urbanizador', label: 'URBANIZADOR / PARCELADOR', desc: 'Sin requisitos de experiencia mínima', obligatorio: false },
+  { key: 'directorConstruccion', label: 'DIRECTOR DE LA CONSTRUCCIÓN', desc: 'Experiencia mínima 3 años o posgrado', obligatorio: true },
+  { key: 'arquitectoProyectista', label: 'ARQUITECTO PROYECTISTA', desc: 'Sin requisitos de experiencia mínima', obligatorio: true },
+  { key: 'disenadorEstructural', label: 'INGENIERO CIVIL DISEÑADOR ESTRUCTURAL', desc: 'Experiencia mínima 5 años o posgrado', obligatorio: true, exigeSupervisionPosible: true },
+  { key: 'disenadorElementosNoEstructurales', label: 'DISEÑADOR DE ELEMENTOS NO ESTRUCTURALES', desc: 'Experiencia mínima 3 años o posgrado', obligatorio: false },
+  { key: 'ingenieroGeotecnista', label: 'INGENIERO CIVIL GEOTECNISTA', desc: 'Experiencia mínima 5 años o posgrado', obligatorio: true, exigeSupervisionPosible: true },
+  { key: 'topografo', label: 'INGENIERO TOPÓGRAFO Y/O TOPÓGRAFO', desc: 'Profesional en topografía o ingeniería catastral', obligatorio: false },
+  { key: 'revisorEstructuralIndependiente', label: 'REVISOR INDEPENDIENTE DE LOS DISEÑOS ESTRUCTURALES', desc: 'Experiencia mínima 5 años o posgrado', obligatorio: false },
+  { key: 'otrosEspecialistas1', label: 'OTROS PROFESIONALES ESPECIALISTAS (1)', desc: 'Hidrosanitario, eléctrico, gas, etc.', obligatorio: false },
+  { key: 'otrosEspecialistas2', label: 'OTROS PROFESIONALES ESPECIALISTAS (2)', desc: 'Acústica, bioclimática, redes, etc.', obligatorio: false }
 ];
